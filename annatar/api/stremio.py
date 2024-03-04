@@ -2,6 +2,8 @@ import os
 from base64 import b64encode
 from enum import Enum
 from typing import Annotated, Any, Optional
+from annatar.api.catalogs.manifest import generate_catalogs
+from annatar.clients.stashdb import Sort, get_scenes
 
 import structlog
 from fastapi import APIRouter, HTTPException, Path, Query, Request
@@ -29,6 +31,7 @@ ORIGIN_IP_HEADER = os.environ.get("ORIGIN_IP_HEADER") or "X-Forwarded-For"
 class MediaType(str, Enum):
     movie = "movie"
     series = "series"
+    porn = "porn"
 
     def __str__(self):
         return self.value
@@ -62,7 +65,9 @@ def get_source_ip(request: Request) -> str:
         source_ip = request.headers.get(
             ORIGIN_IP_HEADER,
             request.client.host,
-        ).split(",")[0]
+        ).split(
+            ","
+        )[0]
     return source_ip
 
 
@@ -80,19 +85,35 @@ async def get_manifest(request: Request, b64config: str) -> dict[str, Any]:
     return {
         "id": config.APP_ID + debrid.short_name() if debrid else config.APP_ID,
         "icon": "https://i.imgur.com/p4V821B.png",
-        "version": config.VERSION.removeprefix("v"),
-        "catalogs": [],
-        "idPrefixes": ["tt"],
-        "resources": ["stream"],
+        "version": "0.0.1",
+        "catalogs": generate_catalogs(),
+        "idPrefixes": ["tt", "porn_"],
+        "resources": ["stream", "catalog"],
         "types": MediaType.all(),
         "name": app_name,
         "logo": "https://i.imgur.com/p4V821B.png",
         "description": "Lord of Gifts. Search popular torrent sites and Debrid caches for streamable content.",
         "behaviorHints": {
+            "adult": True,
             "configurable": True,
             "configurationRequired": False,
         },
     }
+
+
+@router.get("/{b64config:str}/catalog/{type:str}/{id:str}.json")
+@router.get("/{b64config:str}/catalog/{type:str}/{id:str}/genre={tag:str}.json")
+@router.get("/catalog/{type:str}/{id:str}.json")
+async def get_catalog(
+    request: Request,
+    type: str,
+    id: str,
+    tag: Optional[str] = None,
+    skip: Optional[int] = Query(0, alias="skip"),
+) -> dict[str, Any]:
+    if type == "porn":
+        scenes = await get_scenes(tag=tag, sort=Sort.LATEST, skip=skip)
+        return {"metas": scenes}
 
 
 @router.get("/api/v2/hashes/{imdb_id:str}", description="Get hashes for a given IMDB ID")
