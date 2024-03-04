@@ -63,6 +63,7 @@ class RequestLogger(BaseHTTPMiddleware):
         ll = log.bind(
             method=request.method,
             query=request.url.query,
+            path=request.url.path,
             request_id=request_id.get(),
             remote=request.client.host if request.client else None,
         )
