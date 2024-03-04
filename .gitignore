@@ -5,3 +5,11 @@ annatar.db*
 dist
 RELEASE_NOTES.txt
 .coverage
+
+**_pycache__/
+
+.idea
+
+.idea/
+
+

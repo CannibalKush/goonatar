@@ -1,6 +1,4 @@
 from typing import Any
-from gql import Client, gql
-from gql.transport.aiohttp import AIOHTTPTransport
 
 TAGS = {
     "Anal": {
@@ -24,7 +22,7 @@ def generate_catalogs() -> list[dict[str, Any]]:
         {
             "id": "top",
             "type": "porn",
-            "name": "Trending",
+            "name": "Latest",
             "extra": [
                 {"name": "genre", "isRequired": False},
                 {"name": "search", "isRequired": False},

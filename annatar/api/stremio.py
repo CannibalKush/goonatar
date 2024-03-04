@@ -3,7 +3,7 @@ from base64 import b64encode
 from enum import Enum
 from typing import Annotated, Any, Optional
 from annatar.api.catalogs.manifest import generate_catalogs
-from annatar.clients.stashdb import Sort, get_scenes
+from annatar.clients.stashdb import Sort, get_scene, get_scenes
 
 import structlog
 from fastapi import APIRouter, HTTPException, Path, Query, Request
@@ -88,7 +88,11 @@ async def get_manifest(request: Request, b64config: str) -> dict[str, Any]:
         "version": "0.0.1",
         "catalogs": generate_catalogs(),
         "idPrefixes": ["tt", "porn_"],
-        "resources": ["stream", "catalog"],
+        "resources": [
+            "stream",
+            "catalog",
+            {"name": "meta", "types": ["porn"], "idPrefixes": ["porn_"]},
+        ],
         "types": MediaType.all(),
         "name": app_name,
         "logo": "https://i.imgur.com/p4V821B.png",
@@ -101,15 +105,24 @@ async def get_manifest(request: Request, b64config: str) -> dict[str, Any]:
     }
 
 
+@router.get("/{b64config:str}/meta/{type:str}/{id:str}.json")
+async def get_meta(request: Request, type: str, id: str) -> dict[str, Any]:
+    if type == "porn":
+        scene = await get_scene(id.split("_")[1])
+        return {"meta": scene}
+
+
 @router.get("/{b64config:str}/catalog/{type:str}/{id:str}.json")
+@router.get("/{b64config:str}/catalog/{type:str}/{id:str}/skip={skip:int}.json")
 @router.get("/{b64config:str}/catalog/{type:str}/{id:str}/genre={tag:str}.json")
+@router.get("/{b64config:str}/catalog/{type:str}/{id:str}/genre={tag:str}&skip={skip:int}.json")
 @router.get("/catalog/{type:str}/{id:str}.json")
 async def get_catalog(
     request: Request,
     type: str,
     id: str,
     tag: Optional[str] = None,
-    skip: Optional[int] = Query(0, alias="skip"),
+    skip: Optional[int] = None,
 ) -> dict[str, Any]:
     if type == "porn":
         scenes = await get_scenes(tag=tag, sort=Sort.LATEST, skip=skip)
@@ -166,9 +179,9 @@ async def list_streams(
     id: Annotated[
         str,
         Path(
-            title="imdb ID",
-            examples=["tt8927938", "tt0108778:5:8"],
-            regex=r"tt\d+(:\d:\d)?",
+            title="stashDB ID",
+            examples=["15a44ecc-01cc-4161-b5b1-814cf96ddf0c"],
+            regex=r"[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}",
         ),
     ],
     b64config: Annotated[str, Path(description="base64 encoded json blob")],
@@ -182,13 +195,13 @@ async def list_streams(
     if not debrid:
         raise HTTPException(status_code=400, detail="Invalid debrid service")
 
-    imdb_id: str = id.split(":")[0]
-    season_episode: list[int] = [int(i) for i in id.split(":")[1:]]
+    stashdb_id: str = id
+    # season_episode: list[int] = [int(i) for i in id.split(":")[1:]]
     res: StreamResponse = await streams.search(
         type=type,
         debrid=debrid,
-        imdb_id=imdb_id,
-        season_episode=season_episode,
+        stashdb_id=stashdb_id,
+        # season_episode=season_episode,
         max_results=user_config.max_results,
         indexers=user_config.indexers,
         resolutions=user_config.resolutions,
